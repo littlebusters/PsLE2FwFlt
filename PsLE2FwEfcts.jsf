@@ -1,0 +1,193 @@
+// Fireworks Extension: Command
+// Photoshop Live Effect to Fireworsk Filters.
+// version: 0.0.1
+// auther: @littlebusters
+// license: MIT
+
+function LBPsLE2FwEffects()
+{
+	var dom = fw.getDocumentDOM();
+	var sel = fw.selection;
+
+	if( !sel.length ) {
+		alert( 'Select the Object!' )
+		return false;
+	}
+
+	var extractedObj  = new Array(); // filters(with converted PsLE) & the selection
+
+	var extractedIdx  = 0; // index of object PsLE applied
+	var parentIdx     = new Array(); // index of parent object index
+	
+	var targetEfcts   = new Array( 'satin', 'dropShadow', 'innerShadow', 'outerGlow', 'innerGlow', 'solidFill', 'gradientFill', 'patternFill', 'bevelEmboss', 'stroke' );
+	var efctName      = new String(); // PsLE Name
+	var psLEFound     = false;
+
+	// find object PsLE applied.
+	findObject( sel );
+
+	// apply new filter.
+	for( var objLen = extractedObj.length - 1; objLen >= 0; objLen-- ) {
+		fw.selection = extractedObj[ objLen ].selection;
+		dom.applyEffects( extractedObj[ objLen ].convertedFilters );
+	};
+
+
+	
+	// functions ///////////////////////////////////////////////////////////////
+	// find applied filter 
+	function findObject( _obj )
+	{
+		for ( var i = 0; i < _obj.length; i++ ) {
+
+			parentIdx.push( i );
+
+			if( _obj[ i ].toString() == '[object Group]' ) { // object is group
+
+				if( _obj[ i ].effectList ) { // if applied filter
+					findPsLE( _obj[ i ].effectList );
+				}
+
+				// recursive processing.
+				findObject( _obj[ i ].elements );
+
+			} else { // object isn't group
+
+				if( _obj[ i ].effectList ) { // if applied filter
+					findPsLE( _obj[ i ].effectList );
+				}
+
+				parentIdx.pop();
+			}
+		};
+
+		parentIdx.pop();
+	}
+
+	// find allied PsLE & PsLE Converting
+	function findPsLE( _effectList )
+	{
+		var effectNum = _effectList.effects.length;
+
+		for( var efctLen = 0; efctLen < effectNum; efctLen++ ) {
+			if( _effectList.effects[ efctLen ].name.match( /photoshop/i ) ) { // check applied PsLE
+				psLEFound = true;
+				var convertedEfct = new Object();
+				convertedEfct = { category: 'UNUSED', effects: [], name: 'UNUSED' };
+				var efctName = new String();
+				break;
+			}
+		}
+
+		if( psLEFound ) { // applied PsLE
+
+			for( var i = 0; i < effectNum; i++ ) {
+			
+				if( 'Photoshop' == _effectList.effects[ i ].name.substr(0, 9) ) {
+
+					for( var enblLen = 0; enblLen < targetEfcts.length; enblLen++ ) {
+
+						efctName = targetEfcts[ enblLen ];
+						var attrs = _effectList.effects[ i ][ efctName ].split( '&' );
+						var converted = new Object();
+						switch( efctName ) {
+							case 'stroke':
+								break;
+							case 'dropShadow':
+								converted = convertingDropShadow( attrs );
+								convertedEfct.effects.push( converted );
+								break;
+							case 'innerShadow':
+								break;
+							case 'outerGlow':
+								break;
+							case 'innerGlow':
+								break;
+							case 'bevelEmboss':
+								break;
+							case 'satin':
+								break;
+						}
+						// convertedEfct.effects.push( converted );
+					}
+				} else {
+					convertedEfct.effects.push( _effectList.effects[ i ] );
+				}
+			};
+
+			extractedObj[ extractedIdx ] = new Object();
+			extractedObj[ extractedIdx ].selection = 'sel[' + parentIdx[ 0 ] + ']';
+			extractedObj[ extractedIdx ].convertedFilters = convertedEfct;
+
+			for( var i = 1; i < parentIdx.length; i++ ) {
+				extractedObj[ extractedIdx ].selection += '.elements[' + parentIdx[ i ] + ']';
+			};
+
+			extractedObj[ extractedIdx ].selection = eval( extractedObj[ extractedIdx ].selection );
+
+			extractedIdx++;
+		}
+
+		psLEFound = false;
+	}
+
+	// dec to hex
+	function dth( _d )
+	{
+		return ( Math.round( ( _d * 2.56 ) - 1 ) ).toString( 16 );
+	}
+
+	// converting color
+	function convertingColor( _orgColor, _opacity )
+	{
+		var channel = '';
+		var color = '#'
+		for( var i = 1; i < 4; i++ ) {
+			channel = Math.round( _orgColor[ i ] ).toString( 16 );
+			if( 0 == channel ) {
+				channel = String( '0' + channel );
+			}
+			color += channel;
+		};
+		color += dth( _opacity );
+
+		return color;
+	}
+
+	// converting angle
+	function convertingAngle( _angle )
+	{
+		var angle = 180 + Math.floor( _angle );
+		if( 360 < angle ) angle -= 360;
+
+		return angle;
+	}
+
+	function convertingDropShadow( _effectAttr ) {
+		
+		var shadowColor = convertingColor( _effectAttr[ 11 ].split( ';' ), _effectAttr[ 1 ] );
+		var isVisibled = false;
+		if( _effectAttr[ 0 ] ) isVisibled = true;
+		var isKnockOut = false;
+		if( _effectAttr[ 9 ] ) isKnockOut = true;
+
+		var converted = new Object();
+		converted = {
+						name: "Drop Shadow",
+						EffectIsVisibule: isVisibled,
+						category: "Shadow and Glow",
+						ShadowColor: shadowColor,
+						ShadowDistance: Math.floor( _effectAttr[ 5 ] ),
+						ShadowType: isKnockOut,
+						ShadowBlur: Math.floor( _effectAttr[ 6 ] ),
+						ShadowAngle: convertingAngle( _effectAttr[ 3 ] ),
+						EffectMoaID: "{a7944db8-6ce2-11d1-8c76000502701850}"
+					}
+
+		return converted;
+	}
+
+	return true;
+}
+
+LBPsLE2FwEffects();
